@@ -111,11 +111,12 @@ void changeRow(double **array, int len, int order, int pivot,
 void findDivisors(double *array, int len, int order, int row,
   int col, double **div){
 /*
-  @array, the array of the process
-  @len, the length of the array
-  @row, the index of the row where the pivot is
-  @col, the index of the collum where the pivot is
-  @div, the divisors of each row
+  @array, array of the process
+  @len, length of the array
+  @order, order of the matrix
+  @row, index of the row where the pivot is
+  @col, index of the collum where the pivot is
+  @div, divisors of each row
 
   Finds the divisors of the pivot's collum and returns them as param div.
 
@@ -163,12 +164,123 @@ void findDivisors(double *array, int len, int order, int row,
   }
 }
 
+void sendDivisors(double **div, int len, int master, int myrank, MPI_Comm comm){
+/*
+  @param div, array of divisors to be sent
+  @param len, length of the array
+  @param master, number of the process sending
+  @param myrank, number of the process
+  @param comm, communicator
+
+  Sends the divisors to all process
+  --------------
+  (test case)
+  MPI_Init(&argc, &argv);
+  int myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  double *div;
+  div = (double*)calloc(6, sizeof(double));
+  div[0] = 1;
+  div[1] = 2;
+  div[2] = 3;
+  div[3] = 4;
+  div[4] = 5;
+  div[5] = 6;
+  sendDivisors(&div, 6, 0, myrank, MPI_COMM_WORLD);
+  int i;
+  for(i=0;i<6;i++){
+    printf("%lf\n", div[i]);
+  }
+  --------------
+*/
+  double *buf = (double*)calloc(len, sizeof(double));
+  if (myrank==master){
+    buf = *div;
+    }
+  MPI_Bcast(buf, len, MPI_DOUBLE , master, comm);
+  *div = buf;
+}
+
+void subtract(double **array, double *div, int len, int order, int row){
+/*
+  @param array, array of the process
+  @param div, divisors from the pivot process
+  @param len, length of the array
+  @param order, order of the matrix
+  @param row, index of the pivot's row
+
+  Multiply the row of the pivot and subtracts it in the collunm
+  ----------------
+  (test case)
+  MPI_Init(&argc, &argv);
+  int myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  double *div;
+  div = (double*)calloc(4, sizeof(double));
+  double *A = (double*)calloc(6, sizeof(double));
+  div[0] = 1;
+  div[1] = 2;
+  div[2] = 3;
+  div[3] = 4;
+  A[0]=5;
+  A[1]=3;
+  A[2]=6;
+  A[3]=7;
+  A[4]=9;
+  A[5]=11;
+  subtract(&A, div, 6, 2, 0);
+  int i;
+  for(i=0;i<6;i++){
+    printf("%lf\n", A[i]);
+  }
+  MPI_Finalize();
+ return 0;
+ ----------------
+*/
+  int i, stride, k;
+  double aux;
+  for(i=0;i<order;i++){
+    stride = i*len/order;
+    for (k=0;k<(len/order-row-1);k++){
+      aux = (*array)[stride+row]*div[stride+k-i*(row+1)];
+      (*array)[stride+row+1+k] = (*array)[stride+row+k+1] - aux;
+    }
+  }
+}
+
+void nextPivot(){
+/*
+  Pass the responsability to the next pivot because the last one has
+  finished its job or because there are no other rows different of zero in
+  that collumn 
+*/
+
+
+}
 
 
 int main(int argc, char **argv){
-
-
-
+  MPI_Init(&argc, &argv);
+  int myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  double *div;
+  div = (double*)calloc(4, sizeof(double));
+  double *A = (double*)calloc(6, sizeof(double));
+  div[0] = 1;
+  div[1] = 2;
+  div[2] = 3;
+  div[3] = 4;
+  A[0]=5;
+  A[1]=3;
+  A[2]=6;
+  A[3]=7;
+  A[4]=9;
+  A[5]=11;
+  subtract(&A, div, 6, 2, 0);
+  int i;
+  for(i=0;i<6;i++){
+    printf("%lf\n", A[i]);
+  }
   MPI_Finalize();
  return 0;
 }
