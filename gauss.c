@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <mpi.h>
 
-int findPivot(int *array, int len, int begin,int *index){
+int findPivot(double *array, int len, int begin,int *index){
 /*
   @param array, array of the process
   @param len, length of the array
@@ -16,10 +16,10 @@ int findPivot(int *array, int len, int begin,int *index){
   zeros
   -----------------
   (test case)
-  int A[10]={0,2,3,4,5,6,7,8,9,10};
+  double A[10]={0,2,3,4,5,6,7,8,9,10};
   int index;
   findPivot(A, 10, 3, &index);
-  printf("%d\n", index);
+  printf("%lf\n", index);
   ----------------
 */
   //finds the first not zero
@@ -34,8 +34,8 @@ int findPivot(int *array, int len, int begin,int *index){
   }
   //if not found exits with error
   if(array[iaux]==0){
-    return 1;
   }
+    return 1;
   //else, checks for the minimum
   for (i=iaux;i<len;i++){
     if(array[i]<min && array[i]!=0){
@@ -46,7 +46,7 @@ int findPivot(int *array, int len, int begin,int *index){
   return 0;
 }
 
-void changeRow(int **array, int len, int order, int pivot,
+void changeRow(double **array, int len, int order, int pivot,
   int row, int master, int myrank, MPI_Comm comm){
 /*
   @param array, array of the process
@@ -65,8 +65,8 @@ void changeRow(int **array, int len, int order, int pivot,
 
   ------------------
   (test case)
-  int *A;
-  A = (int*)calloc(4, sizeof(int));
+  double *A;
+  A = (double*)calloc(4, sizeof(double));
   int index;
   int myrank;
   MPI_Init(&argc, &argv);
@@ -91,9 +91,8 @@ void changeRow(int **array, int len, int order, int pivot,
   changeRow(&A,6,3,0,index,0, myrank, MPI_COMM_WORLD);
   int i;
   for(i=0;i<6;i++){
-    printf("%d and %d\n", A[i], myrank);
-
-   }
+    printf("%lf and %d\n", A[i], myrank);
+  }
    -----------------------
 */
 
@@ -109,21 +108,43 @@ void changeRow(int **array, int len, int order, int pivot,
 
 }
 
-int main(int argc, char **argv){
-  int *A;
-  A = (int*)calloc(4, sizeof(int));
+void findDivisors(double *array, int len, int order, int row,
+  int col, double **div){
+/*
+  @array, the array of the process
+  @len, the length of the array
+  @row, the index of the row where the pivot is
+  @col, the index of the collum where the pivot is
+  @div, the divisors of each row
+
+  Finds the divisors of the pivot's collum and returns them as param div.
+
+  -------------------
+  (test case)
+  double *A;
+  A = (double*)calloc(4, sizeof(double));
   int index;
   int myrank;
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   if(myrank == 0){
+    int pivotRow = 1;
+    int pivotCol = 0;
+    int order = 2;
+    double *div;
+    div = (double*)calloc(order-pivotRow, sizeof(double));
     A[0]=0;
     A[1]=1;
     A[2]=3;
     A[3]=2;
     A[4]=15;
     A[5]=14;
-    findPivot(A, 6, 0, &index);
+    findDivisors(A, 6, order, pivotRow, pivotCol, &div);
+    int i;
+    for(i=0;i<order-pivotRow;i++){
+      printf("%lf\n", div[i]);
+
+    }
   }
   else{
     A[0]=5;
@@ -133,12 +154,21 @@ int main(int argc, char **argv){
     A[4]=9;
     A[5]=11;
   }
-  changeRow(&A,6,3,0,index,0, myrank, MPI_COMM_WORLD);
+  -------------------
+*/
   int i;
-  for(i=0;i<6;i++){
-    printf("%d and %d\n", A[i], myrank);
+  for(i=0;i<len/order-row;i++){
+    int stride = col*len/order;
+    (*div)[i]=array[stride+row+1+i]/array[stride+row];
+  }
+}
 
-   }
+
+
+int main(int argc, char **argv){
+
+
+
   MPI_Finalize();
  return 0;
 }
