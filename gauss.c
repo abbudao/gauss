@@ -248,39 +248,70 @@ void subtract(double **array, double *div, int len, int order, int row){
   }
 }
 
-void nextPivot(){
+void nextPivot(int *master, int *row, int *col, int myrank, int order, int np,
+  MPI_Comm *comm){
 /*
   Pass the responsability to the next pivot because the last one has
   finished its job or because there are no other rows different of zero in
-  that collumn 
-*/
+  that collumn
 
+  @param master, rannk of the process with pivot
+  @param row, row of the pivot in the process
+  @param col, col of the pivot in the process
+  @param myrank, rank of the process
+  @param order, order of the matrix
+  @param np, number of processes
+  @param comm, comunicator
+  ---------------
+  (test case)
+  MPI_Init(&argc, &argv);
+  int master,row,col;
+  master = row = col = 0;
+  int myrank;
+  MPI_Comm comm;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  comm = MPI_COMM_WORLD;
+  int test= 0;
+  MPI_Comm newC;
+  nextPivot(&master, &row, &col, myrank, 4, 2, &comm);
+  printf("myrank = %d master = %d row = %d col = %d\n", myrank, master, row, col);
+  //test++;
+  //MPI_Comm newC2;
+  nextPivot(&master, &row, &col, myrank, 4, 2, &comm);
+  printf("myrank = %d master = %d row = %d col = %d\n",myrank, master, row, col);
+  nextPivot(&master, &row, &col, myrank, 4, 2, &comm);
+  printf("myrank = %d master = %d row = %d col = %d\n",myrank, master, row, col);
+
+  MPI_Finalize();
+ return 0;
+ ----------------
+*/
+  if(order/np==1||*row!=0 && *row%order/np==0){
+    int color = 0;
+    if(myrank==*master){
+      color = MPI_UNDEFINED;
+    }
+    MPI_Comm_split(*comm, color, myrank, comm);
+    *master = *master+1;
+    *row = *col = 0;
+  }
+  else{
+    (*row)++;
+    (*col)++;
+  }
 
 }
 
 
 int main(int argc, char **argv){
   MPI_Init(&argc, &argv);
+  int master,row,col;
+  master = row = col = 0;
   int myrank;
+  MPI_Comm comm;
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  double *div;
-  div = (double*)calloc(4, sizeof(double));
-  double *A = (double*)calloc(6, sizeof(double));
-  div[0] = 1;
-  div[1] = 2;
-  div[2] = 3;
-  div[3] = 4;
-  A[0]=5;
-  A[1]=3;
-  A[2]=6;
-  A[3]=7;
-  A[4]=9;
-  A[5]=11;
-  subtract(&A, div, 6, 2, 0);
-  int i;
-  for(i=0;i<6;i++){
-    printf("%lf\n", A[i]);
-  }
+  comm = MPI_COMM_WORLD;
+  
   MPI_Finalize();
  return 0;
 }
