@@ -2,11 +2,13 @@
 #include <stdio.h>
 #include <mpi.h>
 
-int findPivot(double *array, int len, int begin,int *index){
+int findPivot(double *array, int len, int order,int row, int col, int *index){
 /*
   @param array, array of the process
   @param len, length of the array
-  @param begin, begining index of the array
+  @param order, order of the matrix
+  @param row, begining index of the array or the pivot's row
+  @param col, the collumn of the pivot
   @param index, index of the pivot
 
   Finds the row with the Pivot from an array.
@@ -23,37 +25,39 @@ int findPivot(double *array, int len, int begin,int *index){
   ----------------
 */
   //finds the first not zero
-  int i, min, iaux;
-  for(i=begin;i<len;i++){
-    if(array[i]!=0){
-      min = array[i];
-      *index = i;
-      iaux = i;
+  int i, iaux;
+  double min;
+  int stride = col*order;
+  for(i=row;i<order;i++){
+    if(array[i+stride]!=0){
+      min = array[i+stride];
+      *index = i+stride;
+      iaux = i+stride;
       break;
     }
   }
   //if not found exits with error
   if(array[iaux]==0){
+      return 1;
   }
-    return 1;
   //else, checks for the minimum
-  for (i=iaux;i<len;i++){
-    if(array[i]<min && array[i]!=0){
-      *index = i;
-      min = array[i];
+  for (i=iaux;i<order;i++){
+    if(array[i+stride]<min && array[i+stride]!=0){
+      *index = i+stride;
+      min = array[i+stride];
     }
   }
   return 0;
 }
 
-void changeRow(double **array, int len, int order, int pivot,
-  int row, int master, int myrank, MPI_Comm comm){
+void changeRow(double **array, int len, int order, int row,
+  int index, int master, int myrank, MPI_Comm comm){
 /*
   @param array, array of the process
   @param len, the length of the array
   @param order, the order of the matrix
-  @param pivot, the position where there will be the pivot
-  @param row, the index of the row to be changed
+  @param row, the position where there will be the pivot
+  @param index, the index of the row to be changed
   @param master, the process with Pivot
   @param myrank, rank of the process
   @param comm, comunicator
@@ -64,7 +68,7 @@ void changeRow(double **array, int len, int order, int pivot,
   order correctly.
 
   ------------------
-  (test case)
+  (test case old)
   double *A;
   A = (double*)calloc(4, sizeof(double));
   int index;
@@ -99,11 +103,11 @@ void changeRow(double **array, int len, int order, int pivot,
   MPI_Bcast(&row,1, MPI_INT,master, comm);
   int aux, i, stride;
 
-  for(i=0;i<len/order-pivot/order;i++){
+  for(i=0;i<len/order-row/order;i++){
     stride = i*order;
-    aux = (*array)[pivot+stride];
-    (*array)[pivot+stride] = (*array)[row+stride];
-    (*array)[row+stride] = aux;
+    aux = (*array)[row+stride];
+    (*array)[row+stride] = (*array)[index+stride];
+    (*array)[index+stride] = aux;
   }
 
 }
@@ -157,9 +161,11 @@ void findDivisors(double *array, int len, int order, int row,
   }
   -------------------
 */
+
   int i;
-  for(i=0;i<len/order-row;i++){
-    int stride = col*len/order;
+
+  for(i=0;i<order-row;i++){
+    int stride = col*order;
     (*div)[i]=array[stride+row+1+i]/array[stride+row];
   }
 }
@@ -201,7 +207,9 @@ void sendDivisors(double **div, int len, int master, int myrank, MPI_Comm comm){
   *div = buf;
 }
 
-void subtract(double **array, double *div, int len, int order, int row){
+void subtract(double **array, double *div, int len, int order, int row, int col,
+  int myrank, int master)
+{
 /*
   @param array, array of the process
   @param div, divisors from the pivot process
@@ -240,11 +248,14 @@ void subtract(double **array, double *div, int len, int order, int row){
   int i, stride, k;
   double aux;
   for(i=0;i<order;i++){
-    stride = i*len/order;
-    for (k=0;k<(len/order-row-1);k++){
+    stride = i*order;
+    for (k=0;k<(order-row-1);k++){
       aux = (*array)[stride+row]*div[stride+k-i*(row+1)];
       (*array)[stride+row+1+k] = (*array)[stride+row+k+1] - aux;
     }
+  }
+  if(myrank == master){
+    (*array)[row+col*order] = 1;
   }
 }
 
@@ -302,16 +313,85 @@ void nextPivot(int *master, int *row, int *col, int myrank, int order, int np,
 
 }
 
+void initializeMatrix(double **A, int order){
+  int i;
+  *A = (double*)malloc(order*order*sizeof(double));
+  for(i=0;i<order*order;i++)
+      (*A)[i] = rand()%50;
+}
+
+void printMatrix(double *A, int order){
+  int i, j;
+  for(i=0;i<order;i++){
+    for(j=0;j<order;j++){
+      printf("%lf ", A[j*order+i]);
+    }
+    printf("\n" );
+  }
+}
+
+void separateMatrix(double **array, double *matrix, int order, int np){
+	  *array = (double*)malloc(order*sizeof(double));
+		MPI_Scatter (matrix, order*order/np, MPI_DOUBLE, *array, order*order/np,
+      MPI_DOUBLE, 0, MPI_COMM_WORLD);
+}
+
+void getMatrixTogether(double *array, double **A, int order,
+  int np, MPI_Comm comm){
+  double *matrix = (double*)calloc(order*order,sizeof(double));
+  MPI_Gather (array, order*order/np, MPI_DOUBLE, matrix, order*order/np, MPI_DOUBLE,
+    0, MPI_COMM_WORLD);
+  *A = matrix;
+}
+
 
 int main(int argc, char **argv){
-  MPI_Init(&argc, &argv);
-  int master,row,col;
+  int master,row,col,myrank, np, index, i;
+  double *A, *array;
+  int order = 6;
   master = row = col = 0;
-  int myrank;
-  MPI_Comm comm;
+  double *div = (double*)malloc((order-1)*sizeof(double));
+
+  MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  MPI_Comm_size(MPI_COMM_WORLD, &np);
+  MPI_Comm comm;
   comm = MPI_COMM_WORLD;
-  
+
+  if (myrank==0){
+    initializeMatrix(&A, order);
+    printMatrix(A, order);
+  }else{
+    A = (double*)calloc(order, sizeof(double));
+  }
+  separateMatrix(&array, A, order, np);
+  //for(i=0;i<order;i++){printf("rank = %d %lf\n",myrank, array[i]);}
+  if(myrank==master){
+    findPivot(array, order*order/np ,order, row, col, &index);
+    printf("pivot = %d\n", index);
+  }
+  changeRow(&array, order*order/np, order, row, index,  master, myrank, comm);
+  //for(i=0;i<order;i++){printf("changed rank = %d %lf\n",myrank, array[i]);}
+  if(myrank==master)
+    findDivisors(array, order*order/np, order, row, col, &div);
+//  for(i=0;i<order-1;i++){printf("diviors = %lf\n",div[i]);}}
+//  for(i=0;i<order;i++)
+  //  printf("%lf\n", div[i]);
+  sendDivisors(&div, order, master, myrank, comm);
+//  for(i=0;i<order-1;i++)printf("diviors = %lf\n",div[i]);
+  subtract(&array, div, order*order/np, order, row, col, myrank, master );
+  getMatrixTogether(array, &A, order, np, comm);
+  if(myrank==0)
+  printMatrix(A, order);
+//  if (myrank==master)
+//  for(i=0;i<order;i++)printf("changed rank = %d %lf\n",myrank, array[i]);
+/*  nextPivot(&master, &row, &col, myrank, order, np, &comm);
+  //printf("-");
+  for(i=0;i<order;i++){printf("%lf ",array[i]);}
+  printf("\n" );
+    //printMatrix(A, order);
+*/
+
   MPI_Finalize();
  return 0;
 }
