@@ -195,27 +195,29 @@ void nextPivot(int *master, int *row, int *col, int myrank, int order, int np,
 */
   MPI_Comm newCom;
   int type, size;
-  getProcess(&type, &size, order ,np);
+//  getProcess(&type, &size, order ,np);
   if(myrank ==0)
   printf("%d row = %d col = %d \n",*master,  *row, *col);
   int nDiv = np - (order%np);
   int n = (nDiv+order)/np;
   int nNormal = order/n;
   int nRest = order%n;
-  if(order/np==1 && order%np==0||(*row)!=0 && ((*col))%(n)==0 && *master<nNormal  && *col!=0
-    ||(*row)!=0 && ((*col))%(nRest)==0 && *master==nNormal && *col!=0){
+  if(order/np==1 && order%np==0||(*row)!=0 && ((*col+1))%(n)==0 && *master<nNormal-2
+    ||(*row)!=0 && ((*col+1))%(nRest)==0 && *master==nNormal-2){
     *master = *master+1;
     *col = 0;
     (*row)++;
 //    printf("hereeeeee, %d  \n",myrank );
   }
   else{
-    if(*row==order-1){
-      *master=*master+1;
-    }
+  //  if(*row==n-1 && master<nNormal-2 || *row==nRest && Master){
+  //    *master=*master+1;
+  //  }
     (*row)++;
     (*col)++;
   }
+  if(myrank==0)
+  printf("master = %d row = %d col = %d\n", *master, *row, *col );
 }
 
 void initializeMatrix(double **A, int order){
@@ -359,7 +361,7 @@ if(myrank==0)
   printMatrix(A, order);
 
 /*while test*/
-  /*  if(myrank==master){
+/*    if(myrank==master){
     findPivot(array, order*order/np ,order, row, col, &index);
   }
   if (myrank == master)
@@ -376,12 +378,13 @@ if(myrank==0)
   subtract(&array, div, order*order/np, order, np, row, col, myrank, master);
   getMatrixTogether(array, &A, order, myrank, np, comm);
   nextPivot(&master, &row, &col, myrank, order, np, &comm);
+  nextPivot(&master, &row, &col, myrank, order, np, &comm);
 //}
 if(myrank==0)
   printMatrix(A, order);
 
   /*while test2*/
-  /*  if(myrank==master){
+/*    if(myrank==master){
       findPivot(array, order*order/np ,order, row, col, &index);
     }
     if (myrank == master)
@@ -401,7 +404,7 @@ if(myrank==0)
   //}
 
   /*while test*/
-/*    if(myrank==master){
+  /*  if(myrank==master){
       findPivot(array, order*order/np ,order, row, col, &index);
     }
     if (myrank == master)
@@ -417,9 +420,9 @@ if(myrank==0)
     printf("\n" );
     subtract(&array, div, order*order/np, order, np, row, col, myrank, master);
     getMatrixTogether(array, &A, order, myrank, np, comm);
-    nextPivot(&master, &row, &col, myrank, order, np, &comm);
+//    nextPivot(&master, &row, &col, myrank, order, np, &comm);
   //}
-  if(myrank==0)
+/*  if(myrank==0)
     printMatrix(A, order);
 */
   if(myrank==0)
