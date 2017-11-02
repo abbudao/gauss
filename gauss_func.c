@@ -224,7 +224,7 @@ void initializeMatrix(double **A, int order){
 /*
   @param A, matrix pointer to be intialized
   @param order, order of matrix
-Intialize a random square matrix [order x order] 
+Intialize a random square matrix [order x order]
 */
   int i;
   *A = (double*)malloc(order*order*sizeof(double));
@@ -234,26 +234,70 @@ Intialize a random square matrix [order x order]
 
 
 void separateMatrix(double **array, double *matrix, int order, int np, int myrank){
+/*
+  @param array, array of the collumns of each process
+  @param matrix, matrix to be separated
+  @param order, order of the matrix
+  @param np, number of processes created
+  @param myrank, number of the process
+
+  Sepatares matrix between the processes
+*/
     /* case order can't be divided by number of processes */
     if(order%np!=0){
+      /*
+        Logic behind the process (variables have bad names, they should be changed):
+          order%np = collumns that can't be divided equally
+          nDiv = what should be added to get to the next number greater than
+            order that can be divided by np
+          nDiv+order = next number that can be divided by np
+          n = number of collumns distributed between the processes
+          nNormal = number of processes that have 'n' number of collumns
+          nRest = the process that have the rest collumns
+
+          Example:
+            order: 9 ; np = 5
+
+            order%np => 9%5 = 4
+            nDiv =>     5-4 = 1
+            n =>        10/5 = 2
+            nNormal =>  9/2 = 4
+            nRest =>    9%2 = 1
+
+        This logic should be revised too, it works based on faith.
+
+      */
       int count;
       int nDiv = np - (order%np);
       int n = (nDiv+order)/np;
       int nNormal = order/n;
       int nRest = order%n;
-    //  printf("nDiv %d n %d nNOrmal %d  nRest %d \n",nDiv, n, nNormal, nRest );
+      /*
+        There are 3 kinds of processes from the logic:
+          Type 0) they have n collumns and there are nNormal of them (myrank<nNormal)
+          Type 1) they have nRest collumns and there is only one (myrank=nNOrmal)
+          Type 2) they have 0 collumns and do nothing, processes created in excess
+      */
       if(myrank==nNormal){
         *array = (double*)malloc(order*nRest*sizeof(double));
         count = order*nRest;
       }
+
       else if(myrank<nNormal){
         *array = (double*)malloc(order*n*sizeof(double));
         count = order*n;
       }
+
       else{
         *array = (double*)malloc(1*sizeof(double));
         count = 0;
       }
+      /*
+        MPI directive needs the number of elements of each array indexed by the
+          number of process. It also needs the position of the first element
+          for each process (displs=displacement).
+
+      */
       int *displs = (int *)calloc(np,sizeof(int));
       int *elements = (int *)calloc(np,sizeof(int));
       int i;
@@ -278,6 +322,11 @@ void separateMatrix(double **array, double *matrix, int order, int np, int myran
 
 void getMatrixTogether(double *array, double **A, int order, int myrank,
   int np, MPI_Comm comm){
+  /*
+    Takes all the collumns distributed between the processes and unifies them
+    into a unique matrix in the process 0.
+    The logic here works similar to the function 'separateMatrix'. 
+  */
 
   double *matrix = (double*)calloc(order*order,sizeof(double));
   if(order%np!=0){
