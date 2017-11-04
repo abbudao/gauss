@@ -234,46 +234,46 @@ Intialize a random square matrix [order x order]
 
 
 void separateMatrix(double **array, double *matrix, int order, int np, int myrank){
-    /* case order can't be divided by number of processes */
-    if(order%np!=0){
-      int count;
-      int nDiv = np - (order%np);
-      int n = (nDiv+order)/np;
-      int nNormal = order/n;
-      int nRest = order%n;
-    //  printf("nDiv %d n %d nNOrmal %d  nRest %d \n",nDiv, n, nNormal, nRest );
-      if(myrank==nNormal){
-        *array = (double*)malloc(order*nRest*sizeof(double));
-        count = order*nRest;
-      }
-      else if(myrank<nNormal){
-        *array = (double*)malloc(order*n*sizeof(double));
-        count = order*n;
-      }
-      else{
-        *array = (double*)malloc(1*sizeof(double));
-        count = 0;
-      }
-      int *displs = (int *)calloc(np,sizeof(int));
-      int *elements = (int *)calloc(np,sizeof(int));
-      int i;
-      for (i=0; i<nNormal; ++i) {
-        displs[i] = i*order*n;
-        elements[i] = order*n;
-      }
-      displs[nNormal] = (nNormal)*order*n;
-      elements[nNormal] = order*nRest;
-      printf("elem %d order = %d\n", elements[0], order*n);
+  int count;
+  int nDiv = np - (order%np);
+  int n = (nDiv+order)/np;
+  int nNormal = order/n;
+  int nRest = order%n;
+  int *displs = (int *)calloc(np,sizeof(int));
+  int *elements = (int *)calloc(np,sizeof(int));
+  int i;
 
-      MPI_Scatterv(matrix, elements, displs, MPI_DOUBLE, *array, count, MPI_DOUBLE,
-                                                        0, MPI_COMM_WORLD);
+  if(order%np!=0){
+    printf("nDiv %d n %d nNOrmal %d  nRest %d \n",nDiv, n, nNormal, nRest );
+    if(myrank==nNormal){
+      *array = (double*)malloc(order*nRest*sizeof(double));
+      count = order*nRest;
     }
-    /* normal case */
+    else if(myrank<nNormal){
+      *array = (double*)malloc(order*n*sizeof(double));
+      count = order*n;
+    }
     else{
+      *array = (double*)malloc(1*sizeof(double));
+      count = 0;
+    }
+    for (i=0; i<nNormal; ++i) {
+      displs[i] = i*order*n;
+      elements[i] = order*n;
+    }
+    displs[nNormal] = (nNormal)*order*n;
+    elements[nNormal] = order*nRest;
+    printf("elem %d order = %d\n", elements[0], order*n);
+
+    MPI_Scatterv(matrix, elements, displs, MPI_DOUBLE, *array, count, MPI_DOUBLE,
+        0, MPI_COMM_WORLD);
+  }
+  /* normal case */
+  else{
     *array = (double*)malloc(order*order/np*sizeof(double));
     MPI_Scatter (matrix, order*order/np, MPI_DOUBLE, *array, order*order/np,
-      MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
+        MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  }
 }
 
 void getMatrixTogether(double *array, double **A, int order, int myrank,

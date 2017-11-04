@@ -12,8 +12,5 @@ void printMatrix(double *A, int order){
     }
       printf("\n");
   }
-  for(i=0;i<order;i++){
-    printf("----");
-  }
       printf("\n");
 }
